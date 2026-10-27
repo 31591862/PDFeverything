@@ -39,6 +39,18 @@ from pathlib import Path
 # stream and the client loses sync with the server, so silence it before any
 # core module gets a chance to call into MuPDF.
 os.environ.setdefault("PYMUPDF_SUGGEST_LAYOUT_ANALYZER", "0")
+
+# Independent entry (`python mcp/server.py`) imports pymupdf directly below —
+# install the startup accelerator first so the heavy pymupdf.layout/4llm stack
+# never loads. Via `main.py --mcp` the core package has already done this.
+sys.path.insert(0, str(Path(__file__).parent.parent))
+try:
+    from core.fast_pymupdf import install as _install_fast_pymupdf
+
+    _install_fast_pymupdf()
+except Exception:  # pragma: no cover — source-tree layouts without core/
+    pass
+
 try:  # pragma: no cover - depends on the installed PyMuPDF build
     import pymupdf
 

@@ -53,6 +53,8 @@ hiddenimports = [
     "openpyxl.worksheet",
     "openpyxl.reader",
     "mcp", "mcp.server",
+    "core", "core.fast_pymupdf", "core.page_editor", "core.pdf_ops", "core.utils",
+    "core.converters", "core.merger", "core.search",
     "tempfile",
     "subprocess",
     "shutil",
@@ -74,6 +76,10 @@ excludes = [
     "pytest",
     "setuptools",
     "pip",
+    # PyMuPDF 2.x 的可选 AI 分析栈：本项目不用 to_markdown/layout，
+    # 打进包里会连带 onnxruntime/numpy 让包体凭空膨胀几百 MB。
+    # core/__init__.py 的 fast_pymupdf 在运行时也会拦截，双保险。
+    "pymupdf4llm", "pymupdf.layout", "pymupdf_layout", "onnxruntime",
 ]
 
 # ── 构建 ─────────────────────────────────────────────────

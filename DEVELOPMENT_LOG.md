@@ -801,3 +801,12 @@ Ver 1.9.1 | 2026-10-28 — 用户报告修复：不规范 PDF 拆分报错 + 启
       to-images/from-images/compress/rotate/encrypt/decrypt/to-word/
       to-ppt/to-excel/nup/页码/元数据/插入页面/搜索/书签/页列表/图片提取）
       + GUI 阅读器打开 + MCP pdf_split 实测通过
+    - 打包瘦身：PyMuPDF 2.x 会在 import 时急切加载 pymupdf4llm/pymupdf.layout
+      （连带 onnxruntime），PyInstaller 静态分析会照单全收打进安装包——
+      build_windows.spec / PDFeverything.spec 的 excludes 增加
+      pymupdf4llm / pymupdf.layout / pymupdf_layout / onnxruntime，
+      hiddenimports 补 core.fast_pymupdf；installer_windows.iss 默认版本号
+      同步 1.9.1；mcp/server.py 独立入口（python mcp/server.py）也先装
+      fast_pymupdf 再 import pymupdf（实测独立启动 0.27s，不再加载 onnx）
+    - 本机（Linux）PyInstaller 冻结烟测通过：onefile 产物 104MB，
+      -h / info / split（123.pdf）/ mixed-merge / GUI 启动全部正常

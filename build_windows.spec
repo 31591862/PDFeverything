@@ -29,7 +29,7 @@ hiddenimports = [
     "openpyxl", "openpyxl.worksheet", "openpyxl.reader",
     "win32com", "win32com.client", "pythoncom",
     "mcp", "mcp.server",
-    "core", "core.page_editor", "core.pdf_ops", "core.utils",
+    "core", "core.fast_pymupdf", "core.page_editor", "core.pdf_ops", "core.utils",
     "core.converters", "core.merger", "core.search",
     "gui", "gui.i18n", "gui.pdf_reader_widget", "gui.main_window",
     "gui.file_list_widget", "gui.workers", "gui.dialogs",
@@ -40,6 +40,10 @@ excludes = [
     "tkinter", "matplotlib", "numpy", "scipy", "pandas",
     "jedi", "IPython", "notebook", "sphinx", "pytest",
     "setuptools", "pip", "lib2to3", "multiprocessing",
+    # PyMuPDF 2.x 的可选 AI 分析栈：本项目不用 to_markdown/layout，
+    # 打进包里会连带 onnxruntime 让 exe 凭空膨胀几百 MB。
+    # core/__init__.py 的 fast_pymupdf 在运行时也会拦截，双保险。
+    "pymupdf4llm", "pymupdf.layout", "pymupdf_layout", "onnxruntime",
 ]
 
 # ── onefile: 所有文件塞进单个 exe ──────────────────────
