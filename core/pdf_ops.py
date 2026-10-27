@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
-from .utils import check_input, ensure_output_dir
+from .utils import check_input, ensure_output_dir, open_pdf_reader
 
 # PyMuPDF prints a one-time "consider pymupdf_layout" notice to stdout the first
 # time table detection runs. On the MCP stdio channel that plain-text line breaks
@@ -100,8 +100,6 @@ class PdfOperator:
     @staticmethod
     def get_info(input_path: Path) -> dict:
         """返回 PDF 元信息字典。"""
-        from pypdf import PdfReader
-
         check_input(input_path)
         size = input_path.stat().st_size
 
@@ -113,7 +111,7 @@ class PdfOperator:
         pages = 0
         info = {}
         try:
-            reader = PdfReader(input_path)
+            reader, _ = open_pdf_reader(input_path)
             encrypted = bool(reader.is_encrypted)
             if not encrypted:
                 info = reader.metadata or {}
@@ -155,7 +153,8 @@ class PdfOperator:
         for i, p in enumerate(input_paths):
             check_input(p)
             _reject_if_encrypted(p)
-            writer.append(p)
+            reader, _ = open_pdf_reader(p)
+            writer.append(reader)
             if progress_callback:
                 progress_callback(f"合并中 ({i+1}/{total}): {p.name}", int((i+1)/total*100))
 
@@ -176,11 +175,11 @@ class PdfOperator:
         page_ranges: [(1,5), (6,10)] 表示拆成两个文件（页码范围 1-based 包含）。
         如果为 None，则每页拆成一个文件。
         """
-        from pypdf import PdfReader, PdfWriter
+        from pypdf import PdfWriter
 
         check_input(input_path)
         _reject_if_encrypted(input_path)
-        reader = PdfReader(input_path)
+        reader, _ = open_pdf_reader(input_path)
         out_dir = ensure_output_dir(output_dir)
         stem = input_path.stem
         total_pages = len(reader.pages)
@@ -225,14 +224,23 @@ class PdfOperator:
         """提取 PDF 纯文本并写入文件（UTF-8）。返回完整文本。
 
         优先用 PyMuPDF（CJK 与版式还原都更好，且是核心依赖），失败时回退到
-        pypdf，保证加密/损坏文件也有最后一次机会。"""
+        pypdf，保证加密/损坏文件也有最后一次机会。
+
+        pypdf 回退带 pikepdf 修复（open_pdf_reader）：文件结构不规范时先用
+        pikepdf 重建再读。但"只有靠紧急修复才能打开、且一个字都提不出来"的
+        文件实际上是救不回来的——这种情况抛错比静默写一个 0 字节的 .txt 更
+        诚实（完全空白但能正常打开的 PDF 走的是 MuPDF 路径，不受影响）。"""
         check_input(input_path)
         _prepare_output(output_path)
         _reject_if_encrypted(input_path)
 
         content = PdfOperator._extract_text_mupdf(input_path, progress_callback)
         if content is None:
-            content = PdfOperator._extract_text_pypdf(input_path, progress_callback)
+            reader, repaired = open_pdf_reader(input_path)
+            content = PdfOperator._extract_text_pypdf(reader, progress_callback)
+            if repaired and not content:
+                raise ValueError(
+                    f"无法从损坏的 PDF 中提取任何文字: {input_path.name}")
 
         output_path.write_text(content, encoding="utf-8")
         return content
@@ -262,9 +270,7 @@ class PdfOperator:
             doc.close()
 
     @staticmethod
-    def _extract_text_pypdf(input_path: Path, progress_callback=None) -> str:
-        from pypdf import PdfReader
-        reader = PdfReader(input_path)
+    def _extract_text_pypdf(reader, progress_callback=None) -> str:
         parts = []
         total = max(1, len(reader.pages))
         for i, page in enumerate(reader.pages, start=1):
@@ -505,15 +511,15 @@ class PdfOperator:
         progress_callback: Optional[Callable[[str, int], None]] = None,
     ) -> None:
         """给每一页叠加水印 PDF。"""
-        from pypdf import PdfReader, PdfWriter
+        from pypdf import PdfWriter
 
         check_input(input_path)
         check_input(watermark_path)
         _prepare_output(output_path)
         _reject_if_encrypted(input_path, watermark_path)
 
-        reader = PdfReader(input_path)
-        watermark_reader = PdfReader(watermark_path)
+        reader, _ = open_pdf_reader(input_path)
+        watermark_reader, _ = open_pdf_reader(watermark_path)
         watermark_page = watermark_reader.pages[0]
         writer = PdfWriter()
         total = len(reader.pages)
@@ -538,7 +544,7 @@ class PdfOperator:
     ) -> None:
         """给 PDF 设置打开密码。空密码会被拒绝——pypdf 会"加密"成不需要密码
         就能打开的文件，静默产生一个没有保护作用的 PDF。"""
-        from pypdf import PdfReader, PdfWriter
+        from pypdf import PdfWriter
 
         if not password or not password.strip():
             raise ValueError("密码不能为空")
@@ -547,7 +553,7 @@ class PdfOperator:
         if progress_callback:
             progress_callback("正在加密...", 50)
 
-        reader = PdfReader(input_path)
+        reader, _ = open_pdf_reader(input_path)
         writer = PdfWriter()
         for page in reader.pages:
             writer.add_page(page)
@@ -582,14 +588,14 @@ class PdfOperator:
         progress_callback: Optional[Callable[[str, int], None]] = None,
     ) -> None:
         """解密 PDF（移除密码）。密码错误时抛出 ValueError。"""
-        from pypdf import PdfReader, PdfWriter
+        from pypdf import PdfWriter
 
         check_input(input_path)
         _prepare_output(output_path)
         if progress_callback:
             progress_callback("正在解密...", 30)
 
-        reader = PdfReader(input_path)
+        reader, _ = open_pdf_reader(input_path)
         if reader.is_encrypted:
             result = reader.decrypt(password)
             if result == 0:
@@ -619,7 +625,7 @@ class PdfOperator:
         progress_callback: Optional[Callable[[str, int], None]] = None,
     ) -> None:
         """旋转指定页面（90/180/270）。"""
-        from pypdf import PdfReader, PdfWriter
+        from pypdf import PdfWriter
 
         if angle not in (90, 180, 270):
             raise ValueError(f"旋转角度必须是 90/180/270，收到: {angle}")
@@ -627,7 +633,7 @@ class PdfOperator:
         check_input(input_path)
         _prepare_output(output_path)
         _reject_if_encrypted(input_path)
-        reader = PdfReader(input_path)
+        reader, _ = open_pdf_reader(input_path)
         writer = PdfWriter()
         total = len(reader.pages)
 

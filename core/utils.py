@@ -62,6 +62,36 @@ def check_input(path: Path) -> Path:
     return path
 
 
+def open_pdf_reader(path):
+    """打开 PDF 并返回 pypdf.PdfReader；文件结构不规范时自动修复后重试。
+
+    pypdf 对 xref 表的容错很弱：遇到被某些软件追加的空 xref 段、截断或
+    混乱的交叉引用表会直接抛 PdfReadError（如 "Could not read Boolean
+    object"），而 pikepdf/PyMuPDF 都能正常读。这里先直接尝试 pypdf，失败
+    后用 pikepdf（attempt_recovery）重写一份到内存再读，两种库至少一个
+    能读时用户就不该看到库的内部错误文本。两者都失败时抛出最后一次的
+    异常（此时文件是真的坏了）。path 可以是 Path 也可以是文件对象。
+
+    返回 (reader, needs_repair)；修复副本只存在于内存中，调用方无需额外动作。"""
+    from pypdf import PdfReader
+
+    try:
+        return PdfReader(path), False
+    except Exception:
+        pass
+
+    import io
+
+    import pikepdf
+    pdf = pikepdf.open(path, attempt_recovery=True)
+    try:
+        buf = io.BytesIO()
+        pdf.save(buf)
+    finally:
+        pdf.close()
+    return PdfReader(buf), True
+
+
 def ensure_output_dir(path: Path) -> Path:
     """确保输出目录存在。"""
     path.mkdir(parents=True, exist_ok=True)
@@ -280,24 +310,35 @@ def set_office_cache(result: dict) -> None:
 
 
 def check_office_availability(use_cache: bool = True) -> dict:
-    """Cross-platform Office detection. Returns {word, powerpoint, excel: bool}.
+    """Office 检测结果（缓存优先）。缓存为空时**同步探测**并写缓存。
 
-    This shells out to `osascript` / COM with a 10 s timeout per application, so
-    on a machine where the probe hangs it can block for 30 s. Callers on a UI
-    thread should run it in a worker (see MainWindow._start_office_probe) or pass
-    `use_cache=False` from the worker itself."""
+    同步探测会 osascript/COM 逐个应用 10 s 超时（最多 30 s），绝不能在 UI 线程
+    直接调用——GUI 启动时应先调 probe_office_cached()（缓存命中立即返回，未
+    命中返回 None），把真正探测交给后台线程。
+    """
     global _office_cache
     if use_cache and _office_cache is not None:
         return _office_cache
 
-    import sys
-    if sys.platform == "win32":
-        result = _check_office_windows()
-    else:
-        result = _check_office_macos()
+    result = probe_office_availability()
     if use_cache:
         _office_cache = result
     return result
+
+
+def probe_office_cached() -> "dict | None":
+    """只读缓存：命中返回结果，未命中返回 None（绝不探测）。
+
+    GUI 用它判断是否需要启动后台探测线程。"""
+    return _office_cache
+
+
+def probe_office_availability() -> dict:
+    """同步探测 Office 三个组件的可用性（可能阻塞最多 30 s）。"""
+    import sys
+    if sys.platform == "win32":
+        return _check_office_windows()
+    return _check_office_macos()
 
 
 # ── 控制台输出编码 ────────────────────────────────────────

@@ -767,3 +767,37 @@ Ver 1.9.0 | 2026-09-18 — QA 加固：19 个缺陷修复 + 热点路径提速�
       报错弹窗，命令行就此卡住（CI 冒烟测试里 180 秒被 kill）；
       新增 core.utils.make_output_encoding_safe()，保留控制台原编码、只把编不出的
       字符降级为 "?"，main.py / pdf_tool.py 两个入口在打印前调用
+
+Ver 1.9.1 | 2026-10-28 — 用户报告修复：不规范 PDF 拆分报错 + 启动慢
+----------------------------------------------------------------
+
+  Ver 1.9.1 | 用户实测反馈：拆分报错 + 启动慢 + 逻辑审查
+    - BUGFIX: 拆分/合并/信息等 pypdf 通道读"末尾被追加空 xref 段"的 PDF
+      （用户实测文件 123.pdf）直接抛 "Could not read Boolean object"——
+      pypdf 对 xref 容错极弱，而 pikepdf/PyMuPDF 都能正常读；
+      新增 core.utils.open_pdf_reader()：先直接 pypdf，失败后用 pikepdf
+      （attempt_recovery）在内存里重建一份再读，split / merge / info /
+      watermark / encrypt / decrypt / rotate / extract_text 及 page_editor
+      的 move/extract_pages 全部走该入口，pypdf 能修的用户文件不再报库错误
+    - 启动提速 ~1.2s：PyMuPDF 2.x 在 import 时急切加载 pymupdf.layout +
+      pymupdf4llm（连带 numpy / onnxruntime / tabulate / multiprocessing），
+      本项目从不调用这些 AI 分析功能；新增 core/fast_pymupdf.py 用
+      meta_path finder 把这两个包"装作未安装"，GUI 模块链导入
+      1.43s → 0.26s，find_tables/渲染/文本提取不受影响；
+      core/__init__.py 统一安装，未来需要 to_markdown 时可 unblock()
+    - 启动提速 2：首次启动的 Office 探测（osascript/COM，最多 30s）在
+      GUI 线程同步执行——`check_office_availability() is not None` 的守卫
+      永远为真（探测函数从不返回 None），_ProbeWorker 是死代码；
+      拆出 probe_office_cached()（只读缓存）/ probe_office_availability()
+      （同步探测），_start_office_probe 缓存未命中时走后台线程，
+      _check_office 改为只渲染缓存结果，绝不在 UI 线程探测
+    - extract_text 语义收紧：MuPDF 打不开、仅靠 pikepdf 紧急修复打开且
+      提不出任何文字的损坏文件，现在报错而不是静默写出 0 字节 .txt
+      （正常空白/扫描 PDF 走 MuPDF 路径不受影响）；对抗性套件
+      "extract_text rejects truncated PDF" 回归通过
+    - fitz 别名的 FutureWarning（PyMuPDF 2.x 每次导入都打）按类别屏蔽，
+      CLI/MCP stderr 不再被污染
+    - 全套件 493 项复跑全绿；123.pdf 全命令（split/merge/extract-text/
+      to-images/from-images/compress/rotate/encrypt/decrypt/to-word/
+      to-ppt/to-excel/nup/页码/元数据/插入页面/搜索/书签/页列表/图片提取）
+      + GUI 阅读器打开 + MCP pdf_split 实测通过

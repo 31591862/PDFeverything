@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Callable
 import io, time, fitz, pypdf
 
+from .utils import open_pdf_reader
+
 MAX_UNDO_DEPTH = 50
 # Every journal state is a full copy of the document, so the depth cap alone does
 # not bound anything: 50 snapshots of a 20MB document is 1GB of RAM, and the same
@@ -385,7 +387,7 @@ class PdfPageEditor:
         # Rebuild doc in new order
         writer = pypdf.PdfWriter()
         buf = io.BytesIO(); self._doc.save(buf)
-        reader = pypdf.PdfReader(io.BytesIO(buf.getvalue()))
+        reader, _ = open_pdf_reader(io.BytesIO(buf.getvalue()))
         for idx in new_order:
             if idx < len(reader.pages):
                 writer.add_page(reader.pages[idx])
@@ -399,7 +401,7 @@ class PdfPageEditor:
         if not ordinals: raise ValueError("no pages selected")
         writer = pypdf.PdfWriter()
         buf = io.BytesIO(); self._doc.save(buf)
-        reader = pypdf.PdfReader(io.BytesIO(buf.getvalue()))
+        reader, _ = open_pdf_reader(io.BytesIO(buf.getvalue()))
         for o in ordinals:
             if 0 <= o < len(reader.pages):
                 writer.add_page(reader.pages[o])

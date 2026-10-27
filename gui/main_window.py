@@ -26,11 +26,12 @@ from PyQt6.QtWidgets import (
 from core.merger import merge_mixed_files
 from core.pdf_ops import PdfOperator
 from core.utils import (
-    check_office_availability,
     cleanup_temp_files,
     filter_by_category,
     format_bytes,
     get_file_category,
+    probe_office_cached,
+    set_office_cache,
 )
 
 from .dialogs import (
@@ -50,7 +51,7 @@ from .pdf_reader_widget import PdfReaderWidget
 from .workers import BaseWorker
 
 
-VERSION = "1.9.0"
+VERSION = "1.9.1"
 
 
 def _dc(dark, light):
@@ -502,12 +503,12 @@ class MainWindow(QMainWindow):
                 pass
 
     def _check_office(self):
-        """Render the Office status from the cached probe result.
+        """Render the Office status from the cached probe result — never probe.
 
-        The probe itself shells out to osascript/COM (up to 30 s), so it runs on a
-        worker thread started by _start_office_probe; this method only formats the
-        now-known answer and is called from the language switch and the probe."""
-        avail = check_office_availability()
+        The probe shells out to osascript/COM (up to 30 s); this method only
+        formats whatever probe_office_cached() already knows and is safe to call
+        from the GUI thread and from _retranslate_ui."""
+        avail = probe_office_cached()
         if avail is None:
             self.office_status_label.setText(tr("office_checking"))
             return
@@ -523,18 +524,25 @@ class MainWindow(QMainWindow):
     def _start_office_probe(self):
         """Detect Word/PowerPoint/Excel off the GUI thread.
 
-        Previously this ran inline in the constructor and froze the window for up
-        to 30 seconds on machines where the AppleScript probe is slow."""
-        if check_office_availability() is not None:
+        The probe runs osascript/COM with a 10 s timeout per application; inline
+        in the constructor it froze the first window paint for up to 30 seconds
+        (the old `check_office_availability() is not None` guard always saw a
+        dict and never started the worker, so the "async" path was dead code).
+        With an empty cache the label shows "checking…" until the worker lands."""
+        if probe_office_cached() is not None:
             self._check_office()
             return
+
+        from PyQt6.QtCore import pyqtSignal
 
         class _ProbeWorker(QThread):
             done = pyqtSignal(dict)
 
             def run(self):  # noqa: D102
+                from core.utils import probe_office_availability
+
                 try:
-                    self.done.emit(check_office_availability(use_cache=False))
+                    self.done.emit(probe_office_availability())
                 except Exception:
                     self.done.emit({})
 
@@ -543,8 +551,7 @@ class MainWindow(QMainWindow):
         self._office_worker.start()
 
     def _on_office_probed(self, avail: dict):
-        import core.utils as utils
-        utils.set_office_cache(avail)
+        set_office_cache(avail)
         self._check_office()
 
     # ── Button state ─────────────────────────────────
