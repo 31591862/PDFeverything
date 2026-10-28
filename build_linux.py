@@ -232,10 +232,24 @@ def step4(version):
         shutil.copy2(ICON_FILE, appdir / ".DirIcon")
 
         out = DIST_DIR / f"PDFeverything_Setup_v{version}_linux.AppImage"
-        rc = run([str(tool), str(appdir), str(out)], timeout=900)
-        if rc != 0 or not out.exists():
+        # Write to a temp name first: a RUNNING instance of the previous
+        # AppImage makes mksquashfs fail on the final path (its squashfs
+        # mount holds the file), while os.replace over it is always allowed.
+        stage = DIST_DIR / f".{out.name}.new"
+        rc = run([str(tool), str(appdir), str(stage)], timeout=900)
+        if rc != 0 or not stage.exists():
+            # Show WHY mksquashfs refused (disk full, bad runtime, …).
+            diag = subprocess.run(
+                [str(tool), "--runtime-file", str(runtime),
+                 str(appdir), str(stage)],
+                capture_output=True, text=True, timeout=900)
+            tail = (diag.stderr or diag.stdout or "").strip().splitlines()[-5:]
+            for line in tail:
+                print(f"      {line}")
+            stage.unlink(missing_ok=True)
             print("    AppImage build failed; the plain binary is still valid")
             return
+        os.replace(stage, out)
         out.chmod(0o755)
         print(f"    {out.name} - {out.stat().st_size / 1024 / 1024:.1f} MB")
     ok("AppImage complete")
