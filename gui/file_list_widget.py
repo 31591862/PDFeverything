@@ -323,17 +323,42 @@ class FileListWidget(QWidget):
             self.files_changed.emit()
 
     def _drag_enter(self, event: QDragEnterEvent):
-        if event.mimeData().hasUrls():
+        mime = event.mimeData()
+        if mime.hasUrls():
+            # External drag: files from a file manager.
             event.acceptProposedAction()
+        elif mime.hasFormat("application/x-qabstractitemmodeldatalist"):
+            # Internal drag: the list's own rows being reordered. Without this
+            # branch the overridden handler ignored the model mime and every
+            # in-list drag was silently cancelled on release (the row snapped
+            # back). Delegate to QListWidget's default handling — NOTE: plain
+            # super() here resolves to FileListWidget(QWidget), NOT the list
+            # widget these handlers are bound to.
+            QListWidget.dragEnterEvent(self.list_widget, event)
         else:
             event.ignore()
 
     def _drop_event(self, event: QDropEvent):
+        mime = event.mimeData()
+        if not mime.hasUrls():
+            if mime.hasFormat("application/x-qabstractitemmodeldatalist"):
+                # Internal reorder: hand back to QListWidget's default drop
+                # handling, which moves the rows and keeps every custom role.
+                QListWidget.dropEvent(self.list_widget, event)
+                self._on_rows_reordered()
+            return
         paths = []
-        for url in event.mimeData().urls():
+        for url in mime.urls():
             p = Path(url.toLocalFile())
             if p.exists():
                 paths.append(p)
         if paths:
             self.add_files(paths)
         event.acceptProposedAction()
+
+    def _on_rows_reordered(self):
+        """Fired after an internal drag-drop reorder. InternalMove moves rows
+        through remove+insert, so rowsMoved never fires — refresh via the same
+        path the ⬆/⬇ buttons use."""
+        self._update_summary()
+        self.files_changed.emit()

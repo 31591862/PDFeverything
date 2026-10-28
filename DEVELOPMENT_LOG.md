@@ -859,3 +859,15 @@ Ver 1.9.3b | 2026-10-28 — Linux 正式适配：构建脚本 + AppImage
       打包 Qt6 的 xcb 平台插件时静态捆绑失败（构建日志有 WARNING 但未拦截），
       目标机器上 Qt 回退不到任何可用平台插件直接 abort。已安装 libxcb-cursor0
       重新构建验证；build_linux.py 构建后新增 GUI 启动烟测步骤
+
+    - BUGFIX: 合并列表内拖动排序"能拖起来、松手无效" —— 列表覆写了
+      dragEnterEvent/dropEvent 用于接收文件管理器拖入，但覆写版对不含
+      文件 URL 的内部排序 mime 直接 ignore()，Qt 因此取消整个排序操作
+      （真实鼠标 xdotool 实测复现：dragEnter source=列表自身被 ignore）。
+      现在按 mime 分流：带 URL → 原有外部文件逻辑；带 model mime →
+      委托 QListWidget 原生 handler 完成排序（注意 super() 会解析到
+      FileListWidget(QWidget) 而非被绑定的 QListWidget，必须显式
+      QListWidget.dragEnterEvent(self.list_widget, event)）；排序落地后
+      补发 files_changed（InternalMove 走 remove+insert，rowsMoved 不会发）
+    - 真实拖拽回归：xdotool XTEST 模拟，dragEnter accepted=True，
+      rows [a,b,c,d] → [b,c,d,a]，自定义 UserRole 数据完整
