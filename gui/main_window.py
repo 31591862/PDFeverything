@@ -660,6 +660,12 @@ class MainWindow(QMainWindow):
         # show()/hide() rather than setVisible(): they are explicit and leave no
         # ambiguity about a widget's visibility state for tests and for Qt.
         if busy:
+            # Reset the bar: after _on_finished it still shows the previous
+            # job's 100, so the next task appeared to start "already done"
+            # until its own first progress tick arrived (mixed merges can take
+            # seconds before that — it looked like 100% then a jump back to 0).
+            self.progress_bar.setValue(0)
+            self.status_label.setText(tr("status_working"))
             self.progress_bar.show()
             self.btn_cancel.show()
         else:

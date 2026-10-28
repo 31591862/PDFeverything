@@ -144,6 +144,7 @@ T = {
 
     # ── Status bar ──
     "status_ready":           {"zh": "就绪",                                        "en": "Ready"},
+    "status_working":         {"zh": "处理中…",                                     "en": "Working…"},
     "status_done":            {"zh": "✅ 完成",                                      "en": "✅ Done"},
     "status_error":           {"zh": "❌ 错误",                                      "en": "❌ Error"},
     "status_cancelled":       {"zh": "⏹️ 已取消",                                   "en": "⏹️ Cancelled"},
