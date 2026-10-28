@@ -407,6 +407,13 @@ class MainWindow(QMainWindow):
         # squeezes the panel below it at narrow window sizes and the buttons
         # get clipped. 292 = widest caption (~270) + left margin (10) + slack.
         right.setMinimumWidth(292)
+        # CRITICAL: the splitter sizes the SCROLL AREA, not the panel inside
+        # it. A QScrollArea's own minimumSizeHint is ~36px, so the handle could
+        # squeeze the viewport to 273 while the panel needs 292 — with the
+        # horizontal scrollbar disabled the last ~19px of every button was cut
+        # off (exactly the reported clipped strip). Pin the floor on the child
+        # the splitter actually resizes: 292 + vertical scrollbar (~8) + frame.
+        scroll.setMinimumWidth(312)
         layout.addWidget(splitter)
 
         out_layout = QHBoxLayout()

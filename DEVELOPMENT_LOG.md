@@ -912,3 +912,14 @@ Ver 1.9.3b | 2026-10-28 — Linux 正式适配：构建脚本 + AppImage
     - BUGFIX(续): 列表行加高后，选中/悬停的行会跳回 17px 原始样式 ——
       QSS 的 ::item padding 规则在出现 :selected/:hover 专属规则后不再
       适用；补齐这两个状态的 padding
+
+    - BUGFIX(真因): 右侧面板按钮右缘仍被裁 —— 上一版把最小宽度设在滚动区
+      内部的面板上，但 QSplitter 调整的是 QScrollArea 本身（其
+      minimumSizeHint 只有 36px），分割条照样把视口压到 273px < 面板所需
+      292px；横向滚动条又已被禁用，于是静默裁掉右边约 19px。现在把下限
+      钉在 splitter 实际调整的 child 上：scroll.setMinimumWidth(312)
+      （292 + 垂直滚动条 8 + 边框），实测把分割条拖到极限面板仍完整显示
+    - BUGFIX: 选中行在列表失焦（点击右侧面板/空白处）时跳回调色板默认
+      选中样式 —— QSS 只声明了 ::item 基础 padding，选中态颜色仍由 Qt
+      调色板按焦点状态取色；现为 :selected 显式指定背景/文字色（取自
+      palette highlight），焦点切换前后行高 31px 与配色完全一致

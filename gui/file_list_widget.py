@@ -118,16 +118,23 @@ class FileListWidget(QWidget):
         self.list_widget.dragEnterEvent = self._drag_enter
         self.list_widget.dropEvent = self._drop_event
         # Comfortable rows: 17px text alone makes rows hard to hit. Vertical
-        # padding lifts every row to ~34px — much easier click target. The
-        # padding must be repeated for :selected/:hover: once a state-specific
-        # rule exists, the plain ::item rule no longer applies to that state
-        # and the row would visually snap back to unpadded (17px) height
-        # exactly when it is selected — the symptom of clicking a row then
-        # seeing it shrink.
+        # padding lifts every row to ~34px — much easier click target.
+        #
+        # Selection colours are pinned explicitly: with no :selected rule Qt
+        # rendered the highlight from the palette, so clicking anywhere outside
+        # the list (focus loss → Inactive palette) repainted the selected row in
+        # the stock grey/blue "original" style. An explicit colour applies in
+        # both focused and unfocused states, keeping the row identical.
+        # Padding must be repeated in the :selected rule: once a state-specific
+        # rule exists the base ::item rule no longer applies to that state, and
+        # the selected row would snap back to 17px.
+        _pal = self.palette()
+        _hl = _pal.highlight().color().name()
+        _hlt = _pal.highlightedText().color().name()
         self.list_widget.setStyleSheet(
             "QListWidget::item { padding: 8px 6px; }"
-            "QListWidget::item:selected { padding: 8px 6px; }"
-            "QListWidget::item:hover { padding: 8px 6px; }")
+            f"QListWidget::item:selected {{ padding: 8px 6px;"
+            f" background: {_hl}; color: {_hlt}; }}")
 
         layout.addWidget(self.list_widget, 1)
 
