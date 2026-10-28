@@ -854,3 +854,8 @@ Ver 1.9.3b | 2026-10-28 — Linux 正式适配：构建脚本 + AppImage
       AppImage 同样验证
     - README：平台徽章加 Linux、下载表加 AppImage 条目、构建文档补
       Linux 段落与"免构建直接跑"说明
+
+    - BUGFIX: AppImage 双击无反应 —— 构建机缺 libxcb-cursor.so.0，PyInstaller
+      打包 Qt6 的 xcb 平台插件时静态捆绑失败（构建日志有 WARNING 但未拦截），
+      目标机器上 Qt 回退不到任何可用平台插件直接 abort。已安装 libxcb-cursor0
+      重新构建验证；build_linux.py 构建后新增 GUI 启动烟测步骤

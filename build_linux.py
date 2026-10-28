@@ -158,7 +158,21 @@ def step3():
              timeout=1200)
     if rc != 0 or not OUTPUT_BIN.exists():
         fail("PyInstaller failed. Check disk space and the log above.")
-    print(f"    File size: {OUTPUT_BIN.stat().st_size / 1024 / 1024:.1f} MB")
+    size = OUTPUT_BIN.stat().st_size / 1024 / 1024
+    print(f"    File size: {size:.1f} MB")
+    # GUI smoke test: a missing system lib (e.g. libxcb-cursor.so.0) makes the
+    # Qt xcb plugin fail at startup — PyInstaller only warns, the build "succeeds",
+    # and the app dies the moment a user double-clicks it. Catch that here.
+    gui_env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    try:
+        probe = subprocess.run(
+            [str(OUTPUT_BIN), "--version"],
+            capture_output=True, text=True, timeout=120, env=gui_env)
+        if probe.returncode != 0:
+            fail(f"Smoke test failed (rc={probe.returncode}):\n{probe.stderr[:500]}")
+        print(f"    Smoke test: {probe.stdout.strip() or 'ok'}")
+    except subprocess.TimeoutExpired:
+        fail("Smoke test timed out")
     ok("Build complete")
 
 
