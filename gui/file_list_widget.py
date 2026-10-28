@@ -117,6 +117,7 @@ class FileListWidget(QWidget):
         self.list_widget.setAcceptDrops(True)
         self.list_widget.dragEnterEvent = self._drag_enter
         self.list_widget.dropEvent = self._drop_event
+        self.list_widget.mousePressEvent = self._list_mouse_press
         # Comfortable rows: 17px text alone makes rows hard to hit. Vertical
         # padding lifts every row to ~34px — much easier click target.
         #
@@ -339,6 +340,21 @@ class FileListWidget(QWidget):
             self.list_widget.insertItem(count - 1, item)
             self.list_widget.setCurrentRow(count - 1)
             self.files_changed.emit()
+
+    def _list_mouse_press(self, event):
+        """Clicking the empty area below the rows clears the selection — Qt has
+        already done that — but it keeps the CURRENT index, and Fusion then
+        paints that "current but unselected" row with a faint highlight. Users
+        read it as the row snapping back to the stock selection style. Clear
+        the current index too so an empty-area click truly deselects.
+
+        NOTE: the handler is bound to the QListWidget, so super() would resolve
+        to FileListWidget(QWidget); call QListWidget's implementation explicitly.
+        """
+        index = self.list_widget.indexAt(event.position().toPoint())
+        QListWidget.mousePressEvent(self.list_widget, event)
+        if not index.isValid():
+            self.list_widget.setCurrentItem(None)
 
     def _drag_enter(self, event: QDragEnterEvent):
         mime = event.mimeData()

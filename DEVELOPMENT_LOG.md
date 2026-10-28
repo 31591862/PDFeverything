@@ -923,3 +923,10 @@ Ver 1.9.3b | 2026-10-28 — Linux 正式适配：构建脚本 + AppImage
       选中样式 —— QSS 只声明了 ::item 基础 padding，选中态颜色仍由 Qt
       调色板按焦点状态取色；现为 :selected 显式指定背景/文字色（取自
       palette highlight），焦点切换前后行高 31px 与配色完全一致
+
+    - BUGFIX(真因3): 点击列表空白处后选中行仍显示"原始选中样式" —— Qt 清空了
+      selection 但保留了 current index，Fusion 会给"当前但未选中"的行画一层
+      淡蓝 ghost 高亮，看起来就像样式跳回。现在拦截列表 mousePressEvent：
+      点到空白区域（indexAt 无效）时一并 setCurrentItem(None)，空白点击真正
+      取消选中。实测：点行 selected=1/currentRow=0 → 点空白 selected=0/
+      currentRow=-1，行恢复纯白交替底色
