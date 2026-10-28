@@ -3,8 +3,10 @@
 使用 ConverterRegistry 注册表模式：新增格式只需实现 BaseConverter 并注册。"""
 
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Callable, List, Optional
@@ -130,6 +132,40 @@ def _verify_pdf(path: Path) -> bool:
         return has
     except Exception:
         return path.stat().st_size > 100
+
+
+def _libreoffice_convert(input_path: Path, output_path: Path,
+                         timeout: int = 300) -> bool:
+    """Convert via LibreOffice headless (Linux/any OS with soffice).
+
+    The highest-fidelity option when MS Office isn't available, and the ONLY
+    one that can read the legacy binary formats (.doc/.ppt/.xls) — the
+    pure-Python fallbacks (python-docx etc.) only speak the OOXML zip formats.
+    """
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if not soffice:
+        return False
+    try:
+        out_dir = output_path.parent
+        # A running LibreOffice instance makes --convert-to silently no-op;
+        # give each call its own profile so it always works headless.
+        with tempfile.TemporaryDirectory(prefix="pdfe_lo_profile_") as profile:
+            r = subprocess.run(
+                [soffice, "--headless", "--norestore",
+                 f"-env:UserInstallation=file://{profile}",
+                 "--convert-to", "pdf", "--outdir", str(out_dir),
+                 str(input_path.resolve())],
+                capture_output=True, text=True, timeout=timeout)
+        produced = out_dir / f"{input_path.stem}.pdf"
+        if r.returncode == 0 and produced.exists() and _verify_pdf(produced):
+            if produced.resolve() != output_path.resolve():
+                produced.replace(output_path)
+            return True
+        return False
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return False
+    except Exception:
+        return False
 
 
 def _applescript_convert(app_name: str, script: str, input_path: Path,
@@ -344,9 +380,22 @@ class WordConverter(BaseConverter):
                     progress_callback(f"Word done (AppleScript): {input_path.name}", 100)
                 return out
 
+        # LibreOffice (Linux desktops, or any OS with soffice). Handles .docx
+        # AND the legacy binary formats (.doc/.rtf edge cases) the pure-Python
+        # fallback cannot read.
+        if _libreoffice_convert(input_path, out, timeout=300):
+            if progress_callback:
+                progress_callback(f"Word done (LibreOffice): {input_path.name}", 100)
+            return out
+
         if progress_callback:
             progress_callback(f"Office unavailable, fallback render: {input_path.name}", 30)
 
+        if input_path.suffix.lower() not in (".docx",):
+            raise ValueError(
+                f"无法转换 {input_path.name}：本机没有安装 Microsoft Office 或 "
+                f"LibreOffice，而 .{input_path.suffix.lower().lstrip('.')} 老格式"
+                f"只有它们能读。安装 LibreOffice 后重试，或把文件另存为 .docx")
         return self._fallback_convert(input_path, out, progress_callback)
 
     def _fallback_convert(self, input_path: Path, out: Path,
@@ -525,9 +574,19 @@ class PowerPointConverter(BaseConverter):
                     progress_callback(f"PPT done (AppleScript): {input_path.name}", 100)
                 return out
 
+        if _libreoffice_convert(input_path, out, timeout=300):
+            if progress_callback:
+                progress_callback(f"PPT done (LibreOffice): {input_path.name}", 100)
+            return out
+
         if progress_callback:
             progress_callback(f"Office unavailable, fallback: {input_path.name}", 30)
 
+        if input_path.suffix.lower() not in (".pptx",):
+            raise ValueError(
+                f"无法转换 {input_path.name}：本机没有安装 Microsoft Office 或 "
+                f"LibreOffice，而 .{input_path.suffix.lower().lstrip('.')} 老格式"
+                f"只有它们能读。安装 LibreOffice 后重试，或把文件另存为 .pptx")
         return self._fallback_convert(input_path, out, progress_callback)
 
     def _fallback_convert(self, input_path: Path, out: Path,
@@ -615,9 +674,19 @@ class ExcelConverter(BaseConverter):
                     progress_callback(f"Excel done (AppleScript): {input_path.name}", 100)
                 return out
 
+        if _libreoffice_convert(input_path, out, timeout=300):
+            if progress_callback:
+                progress_callback(f"Excel done (LibreOffice): {input_path.name}", 100)
+            return out
+
         if progress_callback:
             progress_callback(f"Office unavailable, fallback: {input_path.name}", 30)
 
+        if input_path.suffix.lower() not in (".xlsx",):
+            raise ValueError(
+                f"无法转换 {input_path.name}：本机没有安装 Microsoft Office 或 "
+                f"LibreOffice，而 .{input_path.suffix.lower().lstrip('.')} 老格式"
+                f"只有它们能读。安装 LibreOffice 后重试，或把文件另存为 .xlsx")
         return self._fallback_convert(input_path, out, progress_callback)
 
     def _fallback_convert(self, input_path: Path, out: Path,

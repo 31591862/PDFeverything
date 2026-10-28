@@ -871,3 +871,19 @@ Ver 1.9.3b | 2026-10-28 — Linux 正式适配：构建脚本 + AppImage
       补发 files_changed（InternalMove 走 remove+insert，rowsMoved 不会发）
     - 真实拖拽回归：xdotool XTEST 模拟，dragEnter accepted=True，
       rows [a,b,c,d] → [b,c,d,a]，自定义 UserRole 数据完整
+
+  Ver 1.9.4 | 用户实测反馈：拖入 .doc 提示"所有文件转换均失败"
+    - 根因：WordConverter 声明支持 .doc/.rtf，但纯 Python 回退用的是
+      python-docx——它只读 OOXML zip 格式（.docx），遇到 OLE 二进制的
+      .doc 直接 BadZipFile；.ppt/.xls 同理。Windows/macOS 有 Office COM/
+      AppleScript 能读，Linux 无 Office 机器上这三类文件全灭
+    - 修复：新增 _libreoffice_convert()（soffice --headless --convert-to
+      pdf，独立 UserInstallation profile 避免与运行中的 LO 实例冲突），
+      Word/PPT/Excel 三个转换器在 COM/AppleScript 之后、纯 Python 回退
+      之前插入该路径——LibreOffice 对老格式的保真度也远高于重新排版
+    - 纯 Python 回退限定真正支持的扩展名（.docx/.pptx/.xlsx）；老格式在
+      无 Office 且无 LibreOffice 时给出可操作的中文报错（装 LibreOffice
+      或另存为新格式），不再是含混的"转换失败"
+    - 实测：真实 .doc（MS Word 97 格式）经 LibreOffice 转 PDF 成功；
+      .docx 回退路径回归正常；无 LibreOffice 场景报错文案正确；
+      GUI 端到端 doc→合并 PDF 成功；全套 333 项回归通过

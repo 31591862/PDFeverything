@@ -51,7 +51,7 @@ from .pdf_reader_widget import PdfReaderWidget
 from .workers import BaseWorker
 
 
-VERSION = "1.9.3"
+VERSION = "1.9.4"
 
 
 def _dc(dark, light):
