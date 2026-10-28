@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=PDFeverything
+GenericName=PDF Toolkit
+Comment=One-stop PDF processing: merge, split, convert, compress, watermark, encrypt and read
+Comment[zh_CN]=一站式 PDF 工具：合并、拆分、转换、压缩、水印、加密与阅读
+Exec=PDFeverything
+Icon=PDFeverything
+Terminal=false
+Categories=Office;Viewer;Utility;
+Keywords=PDF;merge;split;convert;compress;watermark;encrypt;阅读器;
+StartupWMClass=PDFeverything

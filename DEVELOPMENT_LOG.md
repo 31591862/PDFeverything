@@ -836,3 +836,21 @@ Ver 1.9.3 | 2026-10-28 — 合并完成后弹出完成提示（修复静默结�
       而不是静默结束——今后不会有任何操作完成后无声无息
     - 回归：GUI 70 + 核心 93 + 对抗 170 项全绿；混合合并/CLI/MCP 的 merge
       调用方均不受影响（返回值向后兼容）
+
+Ver 1.9.3b | 2026-10-28 — Linux 正式适配：构建脚本 + AppImage
+----------------------------------------------------------------
+
+  Ver 1.9.3b | Linux 适配（代码层本就兼容——此前所有开发与测试均在 Linux 完成）
+    - 新增 PDFeverything-linux.spec：onefile 打包，与 Windows spec 同样排除
+      PyMuPDF AI 分析栈（pymupdf4llm/onnxruntime），额外排除 win32 系列；
+      图标用 PNG（X11/Wayland 不认 .ico/.icns）
+    - 新增 build_linux.py：环境检查 → 依赖 → PyInstaller → AppImage 四步，
+      appimagetool 按架构（x86_64/aarch64）自动下载到 .buildcache，失败或
+      未联网时优雅降级为仅出单文件二进制
+    - AppRun 使用 #!/bin/bash（exec -a 是 bash 内建，dash 会报 "exec -a:
+      not found"——首版 AppImage 实测踩坑后修正）
+    - resources/PDFeverything.desktop：标准桌面启动器（打入包内 + AppDir 根）
+    - 实测通过：onefile 104MB，CLI（info/split）与 GUI（窗口打开）均正常；
+      AppImage 同样验证
+    - README：平台徽章加 Linux、下载表加 AppImage 条目、构建文档补
+      Linux 段落与"免构建直接跑"说明

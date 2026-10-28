@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Lezheng2333/PDFeverything/releases"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-blue?style=flat-square" /></a>
+  <a href="https://github.com/Lezheng2333/PDFeverything/releases"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue?style=flat-square" /></a>
   <a href="https://github.com/Lezheng2333/PDFeverything/releases/latest"><img src="https://img.shields.io/badge/version-v1.9.0-007aff?style=flat-square" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" /></a>
 </p>
@@ -32,6 +32,7 @@ Drag everything in — any combination of PDFs, Word documents, PowerPoint decks
 |---|---|
 | 🍎 macOS (Apple Silicon) | [`PDFeverything_macOS.zip`](https://github.com/Lezheng2333/PDFeverything/releases/latest) |
 | 🪟 Windows 10/11 (64-bit) | [`PDFeverything_Setup_v1.9.0.exe`](https://github.com/Lezheng2333/PDFeverything/releases/latest) |
+| 🐧 Linux x86_64 | [`PDFeverything_Setup_v1.9.3_linux.AppImage`](https://github.com/31591862/PDFeverything/releases/latest) — or build from source (below) |
 
 > 🔗 [**Latest Release →**](https://github.com/Lezheng2333/PDFeverything/releases/latest)
 >
@@ -342,6 +343,24 @@ python build_windows.py
 ```bash
 pyinstaller PDFeverything.spec --noconfirm --clean
 # → dist/PDFeverything.app
+```
+
+**Linux** (single-file binary + AppImage, needs Python 3.10+):
+```bash
+python build_linux.py
+# → dist/PDFeverything                                  single-file binary, no install
+# → dist/PDFeverything_Setup_v1.9.3_linux.AppImage      AppImage (auto-downloads appimagetool)
+```
+> Office files (.docx/.pptx/.xlsx) convert via the pure-Python fallback on Linux —
+> no Microsoft Office required. The binary is ~104 MB because Qt and MuPDF are
+> statically bundled; the AI-analysis extras of PyMuPDF (onnxruntime etc.) are
+> excluded on purpose (see `PDFeverything-linux.spec`).
+
+### Run without building
+
+```bash
+python -m pip install -r requirements.txt   # pywin32 is skipped automatically on Linux/macOS
+python main.py                              # GUI
 ```
 
 ## 🧪 Testing
