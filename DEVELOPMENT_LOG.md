@@ -902,3 +902,13 @@ Ver 1.9.3b | 2026-10-28 — Linux 正式适配：构建脚本 + AppImage
       （= 文件列表最小 ~306 + 右面板 292 + 分割条与边距）
     - 文件列表行高从 17px 提到 34px（QListWidget::item 加 8px 上下 padding），
       原行高点击命中困难
+
+    - BUGFIX(续): 右侧面板仍被遮 + 底部出现横向滚动条 —— 两个叠加因素：
+      ① "Office 状态"说明文字 wordWrap=False，整行宽度撑高面板最小需求，
+      窄窗口下文字被右缘切断；改为 setWordWrap(True) 自动换行
+      ② 垂直滚动条出现时会挤占视口宽度（406-8 < 406），QScrollArea 于是
+      弹出横向滚动条来回抖动；横向滚动已被面板最小宽度保证无意义，直接
+      ScrollBarAlwaysOff 关闭
+    - BUGFIX(续): 列表行加高后，选中/悬停的行会跳回 17px 原始样式 ——
+      QSS 的 ::item padding 规则在出现 :selected/:hover 专属规则后不再
+      适用；补齐这两个状态的 padding

@@ -326,6 +326,11 @@ class MainWindow(QMainWindow):
         # Right panel wrapped in scroll area — tools scroll when window is too short
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        # Content minimum width is guaranteed by right.setMinimumWidth() and the
+        # label word-wraps, so a horizontal scrollbar can only appear as a
+        # side-effect of the vertical bar stealing viewport width — pointless
+        # horizontal jiggle; disable it.
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         s_bg = _dc("#2c2c2c", "#f5f5f5"); sb_bg = _dc("#1e1e1e", "#e8e8e8"); sh = _dc("#555", "#bbb")
         scroll.setStyleSheet(
             f"QScrollArea{{background:{s_bg};border:none;}}"
@@ -385,6 +390,11 @@ class MainWindow(QMainWindow):
 
         self.office_status_label = QLabel(tr("office_checking"))
         self.office_status_label.setStyleSheet(f"color: {_dc('#999','#777')};")
+        # Wrap instead of forcing the panel wide: this label carries the
+        # longest fixed text in the panel and used to push the layout minimum
+        # past the viewport at narrow window sizes — the label got clipped and
+        # a horizontal scrollbar appeared under the whole panel.
+        self.office_status_label.setWordWrap(True)
         right_layout.addWidget(self.office_status_label)
         right_layout.addStretch()
 

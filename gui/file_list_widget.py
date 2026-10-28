@@ -118,9 +118,16 @@ class FileListWidget(QWidget):
         self.list_widget.dragEnterEvent = self._drag_enter
         self.list_widget.dropEvent = self._drop_event
         # Comfortable rows: 17px text alone makes rows hard to hit. Vertical
-        # padding lifts every row to ~34px — much easier click target.
+        # padding lifts every row to ~34px — much easier click target. The
+        # padding must be repeated for :selected/:hover: once a state-specific
+        # rule exists, the plain ::item rule no longer applies to that state
+        # and the row would visually snap back to unpadded (17px) height
+        # exactly when it is selected — the symptom of clicking a row then
+        # seeing it shrink.
         self.list_widget.setStyleSheet(
-            "QListWidget::item { padding: 8px 6px; }")
+            "QListWidget::item { padding: 8px 6px; }"
+            "QListWidget::item:selected { padding: 8px 6px; }"
+            "QListWidget::item:hover { padding: 8px 6px; }")
 
         layout.addWidget(self.list_widget, 1)
 
