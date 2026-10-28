@@ -51,7 +51,7 @@ from .pdf_reader_widget import PdfReaderWidget
 from .workers import BaseWorker
 
 
-VERSION = "1.9.2"
+VERSION = "1.9.3"
 
 
 def _dc(dark, light):
@@ -716,6 +716,11 @@ class MainWindow(QMainWindow):
                                       converted=result["converted"],
                                       total=result["total_files"],
                                       failed_list=failed_list))
+            elif "merged" in result:
+                self._show_message("information", tr("status_done"),
+                                   tr("msg_merge_done",
+                                      count=result["merged"],
+                                      output=result.get("output", "")))
             elif "ratio" in result:
                 self._show_message("information", tr("dlg_compress_title"),
                                    tr("msg_compress_done",
@@ -736,6 +741,12 @@ class MainWindow(QMainWindow):
             self._show_message("information", tr("status_done"),
                                tr("msg_done_files", count=len(result),
                                   output=out_dir))
+        else:
+            # A worker that returns None (or anything unrecognised) used to
+            # finish silently — no dialog, just the status bar text. Always
+            # tell the user the operation ended, even without details.
+            self._show_message("information", tr("status_done"),
+                               tr("msg_done_generic"))
 
     def _on_error(self, msg: str):
         if not self._is_current_worker():

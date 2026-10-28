@@ -141,8 +141,8 @@ class PdfOperator:
         input_paths: List[Path],
         output_path: Path,
         progress_callback: Optional[Callable[[str, int], None]] = None,
-    ) -> None:
-        """将多个 PDF 合并为一个。"""
+    ) -> dict:
+        """将多个 PDF 合并为一个。返回 {merged, output} 供完成提示使用。"""
         from pypdf import PdfWriter
 
         if not input_paths:
@@ -160,6 +160,9 @@ class PdfOperator:
 
         writer.write(output_path)
         writer.close()
+        if progress_callback:
+            progress_callback("合并完成", 100)
+        return {"merged": total, "output": str(output_path)}
 
     # ── 3. 拆分 ────────────────────────────────────────
 

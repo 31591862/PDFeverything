@@ -282,8 +282,9 @@ T = {
                                       "以下文件未能转换:\n{failed_list}",
                                "en": "Converted {converted} of {total} files.\n\n"
                                      "Failed:\n{failed_list}"},
-    "msg_merge_done":         {"zh": "已成功处理 {count} 个文件。\n输出: {output}",
-                               "en": "Processed {count} file(s).\nOutput: {output}"},
+    "msg_merge_done":         {"zh": "合并完成：{count} 个文件 → {output}",
+                              "en": "Merged {count} file(s) → {output}"},
+    "msg_done_generic":       {"zh": "操作完成。", "en": "Operation completed."},
     "msg_compress_done":      {"zh": "原始大小: {before}\n压缩后: {after}\n减小: {ratio:.1f}%",
                                "en": "Original: {before}\nCompressed: {after}\nReduction: {ratio:.1f}%"},
     "msg_done_count":         {"zh": "已成功处理，共 {count} 项。",                     "en": "Processed {count} item(s)."},
