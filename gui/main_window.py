@@ -51,7 +51,7 @@ from .pdf_reader_widget import PdfReaderWidget
 from .workers import BaseWorker
 
 
-VERSION = "1.9.1"
+VERSION = "1.9.2"
 
 
 def _dc(dark, light):
@@ -226,6 +226,7 @@ class MainWindow(QMainWindow):
         self.btn_browse_out.setText(tr("btn_browse"))
         self.btn_cancel.setText(tr("btn_cancel"))
         self.label_output.setText(tr("label_output"))
+        self.output_path_edit.setToolTip(tr("output_path_tip"))
         # Tab names
         self.tabs.setTabText(0, tr("tab_merge"))
         self.tabs.setTabText(1, tr("tab_reader"))
@@ -393,8 +394,11 @@ class MainWindow(QMainWindow):
         self.label_output = QLabel(tr("label_output"))
         out_layout.addWidget(self.label_output)
         self.output_path_edit = QLineEdit()
+        # The field holds the output DIRECTORY (or a .pdf file path, which is
+        # then the exact merge target). Operations write straight into it.
         dfl = self._settings.value("output_dir", str(Path.home() / "Desktop"))
-        self.output_path_edit.setText(dfl + "/" + tr("default_output"))
+        self.output_path_edit.setText(dfl)
+        self.output_path_edit.setToolTip(tr("output_path_tip"))
         out_layout.addWidget(self.output_path_edit)
         self.btn_browse_out = QPushButton(tr("btn_browse"))
         self.btn_browse_out.clicked.connect(self._on_browse_output)
@@ -580,25 +584,54 @@ class MainWindow(QMainWindow):
             self.btn_merge.setText(tr("btn_merge_unified"))
 
     # ── Output path ──────────────────────────────────
+    #
+    # The bottom "输出路径" field is the single source of truth for where
+    # results go. Operations used to open a save dialog seeded from it — the
+    # field was only a "remember my last location" hint, so every click asked
+    # the user to confirm a path they had already set. Now ops write straight
+    # into the shown directory (existing targets get a _1 suffix instead of a
+    # silent overwrite), and only 浏览... opens a picker (for the directory).
+
+    def _resolve_output_dir(self) -> Path:
+        """Directory the field points at. A .pdf value means "merge target
+        file"; everything else then uses its parent. Empty falls back to
+        Desktop (or home when there is no Desktop)."""
+        text = self.output_path_edit.text().strip()
+        if not text:
+            home = Path.home()
+            desktop = home / "Desktop"
+            return desktop if desktop.is_dir() else home
+        p = Path(text)
+        return p.parent if p.suffix.lower() == ".pdf" else p
+
+    @staticmethod
+    def _unique_path(p: Path) -> Path:
+        """Never overwrite: insert _1, _2 … before the extension when taken."""
+        if not p.exists():
+            return p
+        for i in range(1, 1000):
+            cand = p.with_name(f"{p.stem}_{i}{p.suffix}")
+            if not cand.exists():
+                return cand
+        return p
 
     def _get_output_path(self, suffix: str = None) -> Optional[Path]:
+        """Target file for a single-file operation, derived from the field."""
         if suffix is None:
             suffix = tr("default_output")
-        current = self.output_path_edit.text().strip()
-        if current and not current.endswith(suffix):
-            current = str(Path(current).parent / suffix)
-        if current and Path(current).parent.exists():
-            path, _ = QFileDialog.getSaveFileName(
-                self, tr("dlg_save_pdf"), current, tr("file_filter_pdf"))
-        else:
-            default = str(Path.home() / "Desktop" / suffix)
-            path, _ = QFileDialog.getSaveFileName(
-                self, tr("dlg_save_pdf"), default, tr("file_filter_pdf"))
-        if path:
-            self.output_path_edit.setText(path)
-            self._settings.setValue("output_dir", str(Path(path).parent))
-            return Path(path)
-        return None
+        out_dir = self._resolve_output_dir()
+        self._settings.setValue("output_dir", str(out_dir))
+        return self._unique_path(out_dir / suffix)
+
+    def _merge_output_path(self) -> Optional[Path]:
+        """Merge target: the field's exact .pdf file, or default_merged.pdf
+        inside the field's directory."""
+        text = self.output_path_edit.text().strip()
+        out_dir = self._resolve_output_dir()
+        self._settings.setValue("output_dir", str(out_dir))
+        if text and text.lower().endswith(".pdf"):
+            return self._unique_path(Path(text))
+        return self._unique_path(out_dir / tr("default_merged"))
 
     # ── Worker ───────────────────────────────────────
 
@@ -699,8 +732,10 @@ class MainWindow(QMainWindow):
             self._show_message("information", tr("status_done"),
                                tr("msg_done_count", count=result))
         elif isinstance(result, list):
+            out_dir = Path(result[0]).parent if result else ""
             self._show_message("information", tr("status_done"),
-                               tr("msg_done_files", count=len(result)))
+                               tr("msg_done_files", count=len(result),
+                                  output=out_dir))
 
     def _on_error(self, msg: str):
         if not self._is_current_worker():
@@ -731,7 +766,7 @@ class MainWindow(QMainWindow):
         if not paths:
             QMessageBox.warning(self, tr("msg_op_failed"), tr("msg_no_files"))
             return
-        out = self._get_output_path(tr("default_merged"))
+        out = self._merge_output_path()
         if not out:
             return
         cats = set(get_file_category(p) for p in paths)
@@ -815,13 +850,7 @@ class MainWindow(QMainWindow):
         dlg = SplitRangeDialog(self)
         if not dlg.exec():
             return
-        start_dir = Path(self._settings.value(
-            "output_dir", str(Path.home() / "Desktop")))
-        chosen = QFileDialog.getExistingDirectory(
-            self, tr("dlg_select_output_dir"), str(start_dir))
-        if not chosen:
-            return
-        out_dir = Path(chosen)
+        out_dir = self._resolve_output_dir()
         mode = dlg.get_mode()
         if mode == 0:
             self._run_worker(PdfOperator.split, ip, out_dir, None)
@@ -936,11 +965,8 @@ class MainWindow(QMainWindow):
         if not files:
             return
         if len(files) == 1:
-            out, _ = QFileDialog.getSaveFileName(
-                self, tr("dlg_save_text"), f"{files[0].stem}.txt", tr("file_filter_text"))
-            if not out:
-                return
-            self._run_worker(PdfOperator.extract_text, files[0], Path(out))
+            out = self._get_output_path(f"{files[0].stem}.txt")
+            self._run_worker(PdfOperator.extract_text, files[0], out)
         else:
             self._run_batch(files, "text", PdfOperator.extract_text, ext=".txt")
 
@@ -949,10 +975,8 @@ class MainWindow(QMainWindow):
         if not files:
             return
         if len(files) == 1:
-            out_dir = QFileDialog.getExistingDirectory(self, tr("dlg_select_output_dir"))
-            if not out_dir:
-                return
-            self._run_worker(PdfOperator.extract_images, files[0], Path(out_dir))
+            self._run_worker(PdfOperator.extract_images, files[0],
+                             self._get_batch_output_dir())
         else:
             self._run_batch(files, "images", PdfOperator.extract_images)
 
@@ -962,10 +986,8 @@ class MainWindow(QMainWindow):
             return
         dpi = int(self._settings.value("dpi", 200))
         if len(files) == 1:
-            out_dir = QFileDialog.getExistingDirectory(self, tr("dlg_select_output_dir"))
-            if not out_dir:
-                return
-            self._run_worker(PdfOperator.to_images, files[0], Path(out_dir), dpi)
+            self._run_worker(PdfOperator.to_images, files[0],
+                             self._get_batch_output_dir(), dpi)
         else:
             self._run_batch(files, "pages", PdfOperator.to_images, dpi)
 
@@ -975,8 +997,6 @@ class MainWindow(QMainWindow):
         if not files:
             return
         out = self._get_output_path(tr("default_images"))
-        if not out:
-            return
         self._run_worker(PdfOperator.from_images, [Path(f) for f in files], out)
 
     def _pick_input_files(self) -> List[Path]:
@@ -998,12 +1018,10 @@ class MainWindow(QMainWindow):
         return files[0] if files else None
 
     def _get_batch_output_dir(self) -> Optional[Path]:
-        """Ask user to pick a directory for batch output."""
-        d = Path(self._settings.value(
-            "output_dir", str(Path.home() / "Desktop")))
-        path = QFileDialog.getExistingDirectory(
-            self, tr("dlg_select_output_dir"), str(d))
-        return Path(path) if path else None
+        """Directory for batch output — straight from the field, no dialog."""
+        out_dir = self._resolve_output_dir()
+        self._settings.setValue("output_dir", str(out_dir))
+        return out_dir
 
     def _get_batch_output_path(self, input_path: Path, suffix: str, out_dir: Path,
                                 ext: str = ".pdf") -> Path:
@@ -1014,25 +1032,22 @@ class MainWindow(QMainWindow):
         self.file_list._on_add_files()
 
     def _on_browse_output(self):
-        current = self.output_path_edit.text().strip()
-        if not current:
-            current = str(Path.home() / "Desktop" / tr("default_output"))
-        path, _ = QFileDialog.getSaveFileName(
-            self, tr("dlg_save_pdf"), current, tr("file_filter_pdf"))
+        """浏览... picks the output directory (no file dialog for merges —
+        the field itself is the merge target when it ends with .pdf)."""
+        current = self._resolve_output_dir()
+        path = QFileDialog.getExistingDirectory(
+            self, tr("dlg_select_output_dir"), str(current))
         if path:
             self.output_path_edit.setText(path)
+            self._settings.setValue("output_dir", path)
 
     def _on_to_word(self):
         files = self._pick_input_files()
         if not files:
             return
         if len(files) == 1:
-            out, _ = QFileDialog.getSaveFileName(
-                self, tr("dlg_save_text"), f"{files[0].stem}.docx",
-                tr("file_filter_word"))
-            if not out:
-                return
-            self._run_worker(PdfOperator.to_word, files[0], Path(out))
+            out = self._get_output_path(f"{files[0].stem}.docx")
+            self._run_worker(PdfOperator.to_word, files[0], out)
         else:
             self._run_batch(files, "word", PdfOperator.to_word, ext=".docx")
 
@@ -1042,12 +1057,8 @@ class MainWindow(QMainWindow):
             return
         dpi = int(self._settings.value("dpi", 200))
         if len(files) == 1:
-            out, _ = QFileDialog.getSaveFileName(
-                self, tr("dlg_save_text"), f"{files[0].stem}.pptx",
-                tr("file_filter_ppt"))
-            if not out:
-                return
-            self._run_worker(PdfOperator.to_ppt, files[0], Path(out), dpi)
+            out = self._get_output_path(f"{files[0].stem}.pptx")
+            self._run_worker(PdfOperator.to_ppt, files[0], out, dpi)
         else:
             self._run_batch(files, "ppt", PdfOperator.to_ppt, dpi, ext=".pptx")
 
@@ -1056,12 +1067,8 @@ class MainWindow(QMainWindow):
         if not files:
             return
         if len(files) == 1:
-            out, _ = QFileDialog.getSaveFileName(
-                self, tr("dlg_save_text"), f"{files[0].stem}.xlsx",
-                tr("file_filter_excel"))
-            if not out:
-                return
-            self._run_worker(PdfOperator.to_excel, files[0], Path(out))
+            out = self._get_output_path(f"{files[0].stem}.xlsx")
+            self._run_worker(PdfOperator.to_excel, files[0], out)
         else:
             self._run_batch(files, "excel", PdfOperator.to_excel, ext=".xlsx")
 

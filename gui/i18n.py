@@ -287,7 +287,7 @@ T = {
     "msg_compress_done":      {"zh": "原始大小: {before}\n压缩后: {after}\n减小: {ratio:.1f}%",
                                "en": "Original: {before}\nCompressed: {after}\nReduction: {ratio:.1f}%"},
     "msg_done_count":         {"zh": "已成功处理，共 {count} 项。",                     "en": "Processed {count} item(s)."},
-    "msg_done_files":         {"zh": "已生成 {count} 个文件。",                         "en": "Generated {count} file(s)."},
+    "msg_done_files":         {"zh": "已生成 {count} 个文件 → {output}",                "en": "Generated {count} file(s) → {output}"},
     "msg_op_failed":          {"zh": "操作失败",                                      "en": "Operation failed"},
 
     # ── Compose: page numbers / metadata / n-up / insert ──
@@ -382,7 +382,11 @@ T = {
                                      "© 2026"},
 
     # ── Default output filename ──
-    "default_output":         {"zh": "output.pdf",                                  "en": "output.pdf"},
+    "output_path_tip":        {"zh": "所有操作的输出位置：结果直接写入此目录，不再弹窗询问。"
+                                     "以 .pdf 结尾时，合并结果保存为该文件；目标文件已存在时自动加 _1 后缀",
+                              "en": "Where results go: operations write straight into this folder "
+                                    "without asking. If it ends with .pdf, merges are saved to that "
+                                    "file; existing targets get a _1 suffix instead of being overwritten"},
     "default_merged":         {"zh": "merged.pdf",                                  "en": "merged.pdf"},
     "default_images":         {"zh": "images.pdf",                                  "en": "images.pdf"},
     "default_word_merged":    {"zh": "word_merged.pdf",                              "en": "word_merged.pdf"},
