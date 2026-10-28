@@ -63,7 +63,7 @@ except Exception:
     except Exception:
         pass
 
-SERVER_VERSION = "1.9.4"
+SERVER_VERSION = "1.9.5"
 
 # ── Tool definitions (OpenAI-compatible JSON schemas) ──────
 

@@ -117,6 +117,10 @@ class FileListWidget(QWidget):
         self.list_widget.setAcceptDrops(True)
         self.list_widget.dragEnterEvent = self._drag_enter
         self.list_widget.dropEvent = self._drop_event
+        # Comfortable rows: 17px text alone makes rows hard to hit. Vertical
+        # padding lifts every row to ~34px — much easier click target.
+        self.list_widget.setStyleSheet(
+            "QListWidget::item { padding: 8px 6px; }")
 
         layout.addWidget(self.list_widget, 1)
 

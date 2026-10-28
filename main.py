@@ -114,7 +114,7 @@ Subsequent runs in the same session are instant.
 """
 
 
-VERSION = "1.9.4"
+VERSION = "1.9.5"
 PROJECT_DIR = Path(__file__).parent.resolve()
 _DARK_MODE = False  # set by launch_gui before any GUI widgets are created
 

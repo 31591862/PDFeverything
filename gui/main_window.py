@@ -51,7 +51,7 @@ from .pdf_reader_widget import PdfReaderWidget
 from .workers import BaseWorker
 
 
-VERSION = "1.9.4"
+VERSION = "1.9.5"
 
 
 def _dc(dark, light):
@@ -75,7 +75,11 @@ class MainWindow(QMainWindow):
 
     def _init_ui(self):
         self.setWindowTitle(tr("window_title"))
-        self.setMinimumSize(900, 600)
+        # 1060 = file list minimum (~306 with a populated list) + right panel
+        # minimum (292) + splitter handles, margins and a usable drag range.
+        # At 900 the right panel was squeezed below its content width and the
+        # operation buttons were partially hidden with no scrollbar to reach.
+        self.setMinimumSize(1060, 620)
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -388,6 +392,11 @@ class MainWindow(QMainWindow):
         splitter.addWidget(scroll)
         splitter.setStretchFactor(0, 2)
         splitter.setStretchFactor(1, 1)
+        # The merge button's caption ("🔀 合并为 PDF (200 个文件)") sets the
+        # panel's real width floor. Without a minimum the splitter happily
+        # squeezes the panel below it at narrow window sizes and the buttons
+        # get clipped. 292 = widest caption (~270) + left margin (10) + slack.
+        right.setMinimumWidth(292)
         layout.addWidget(splitter)
 
         out_layout = QHBoxLayout()
